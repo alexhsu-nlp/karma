@@ -27,7 +27,7 @@ cd /path/to/karma/repo
 pip install .
 ```
 
-The base and word lists that the program use are stored in `karma/morpheme.txt`. The user might want to install via `pip install -e .` instead if they want to modify or add out-of-vocabulary words to this file.
+The base and word lists that the program use are stored in `karma/morpheme.txt` (or view it [here](https://github.com/alexhsu-nlp/karma/blob/main/karma/morphemes.txt)). The user might want to install via `pip install -e .` instead if they want to modify or add out-of-vocabulary words to this file.
 
 If you want to use the GUI (notice that this will not get installed as a part of the karma package, but simply stays in the repository as a separate script), you will need to either use the [released binaries](https://github.com/alexhsu-nlp/karma/releases/tag/0.0.1), where you don't even need Python installed, or install [flask](https://flask.palletsprojects.com/en/stable/) and [waitress](https://docs.pylonsproject.org/projects/waitress/en/latest/):
 
