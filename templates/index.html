@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KARMA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+
+        .input-area input[type="text"] {
+            width: 60%;
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        .input-area button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+
+        #waiting-message {
+            color: red;
+            margin-left: 10px;
+            display: none;
+        }
+
+        .results-wrapper {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 10px 0;
+            border-top: 1px solid #ccc;
+            margin-top: 20px;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            width: max-content;
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 4px 8px;
+            margin: 2px 0;
+            background: #f0f0f0;
+            border-radius: 8px;
+            text-align: center;
+            white-space: nowrap;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: background .2s;
+        }
+
+        .chip.selected {
+            background: #a8e6a3;
+        }
+
+        .empty-chip {
+            background: #ffcccc;
+            color: #a00;
+            min-height: 24px;
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            text-align: center;
+            white-space: nowrap;
+            cursor: default;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: clamp(12px, 5vw, 24px);
+        }
+
+        #selected-area {
+            margin-top: 30px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 40px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        #selected-area .chip {
+            background: #cde6ff;
+            cursor: default;
+        }
+
+        #copy-button,
+        #switch-view,
+        #clear-selection {
+            margin-top: 10px;
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Experimental Kalaallisut Morphological Analyzer (KARMA) Demo</h1>
+
+    <form method="post" class="input-area" id="analyze-form">
+        <input type="text" name="sentence" id="sentence-input" placeholder="Type a sentence here..." list="history"
+            value="{{ sentence|default('') }}" required autofocus>
+        <input type="hidden" name="view" id="view-field" value="{{ view|default('str') }}">
+        <datalist id="history">
+            {% for past in history %}
+            <option value="{{ past }}">
+                {% endfor %}
+        </datalist>
+        <button type="submit" id="analyze-button">Analyze</button>
+        <span id="waiting-message">Waiting ...</span>
+    </form>
+
+    {% if result_str %}
+    <div style="margin-top:10px;">
+        <button type="button" id="switch-view">Switch view</button>
+        <button type="button" id="clear-selection" style="margin-left:8px;">Clear selections</button>
+    </div>
+
+    <!-- view: standard representation -->
+    <!-- <p>DEBUG view = {{ view }}</p> -->
+    <div class="results-wrapper {% if view != 'str' %}hidden{% endif %}" id="view-str" data-view="str">
+        {% for sublist in result_str %}
+        <div class="column">
+            {% if sublist %}
+            {% for morpheme in sublist %}
+            <span class="chip" data-col="{{ loop.index0 }}">{{ morpheme }}</span>
+            {% endfor %}
+            {% else %}
+            <span class="chip empty-chip">fail</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- view: mofo representation (hidden by default) -->
+    <div class="results-wrapper {% if view != 'mofo' %}hidden{% endif %}" id="view-mofo" data-view="mofo">
+        {% for sublist in result_mofo %}
+        <div class="column">
+            {% if sublist %}
+            {% for morpheme in sublist %}
+            <span class="chip" data-col="{{ loop.index0 }}">{{ morpheme }}</span>
+            {% endfor %}
+            {% else %}
+            <span class="chip empty-chip">fail</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div id="selected-area" aria-live="polite"></div>
+
+    <div>
+        <button type="button" id="copy-button">Copy Morpheme Segmentation</button>
+    </div>
+
+    <script>
+        (function () {
+            const viewStr = document.getElementById('view-str');
+            const viewMofo = document.getElementById('view-mofo');
+            const switchBtn = document.getElementById('switch-view');
+            const clearBtn = document.getElementById('clear-selection');
+            const selectedArea = document.getElementById('selected-area');
+            const copyBtn = document.getElementById('copy-button');
+
+            function isVisible(el) { return el && !el.classList.contains('hidden'); }
+            function visibleWrapper() { return isVisible(viewStr) ? viewStr : viewMofo; }
+
+            // Event delegation: handle clicks on any chip inside any results-wrapper
+            document.querySelectorAll('.results-wrapper').forEach(wrapper => {
+                wrapper.addEventListener('click', function (ev) {
+                    const chip = ev.target.closest('.chip');
+                    if (!chip || chip.classList.contains('empty-chip')) return;
+
+                    const col = chip.closest('.column');
+                    if (!col) return;
+
+                    if (chip.classList.contains('selected')) {
+                        // deselect all selected elements
+                        chip.classList.remove('selected');
+                    } else {
+                        // deselect all others in the column
+                        col.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+                        // select clicked chip
+                        chip.classList.add('selected');
+                    }
+
+                    rebuildSelectedArea();
+                });
+            });
+
+            document.getElementById('analyze-form').addEventListener('submit', function () {
+                document.getElementById('waiting-message').style.display = 'inline';
+                document.getElementById('analyze-button').disabled = true;
+                // setTimeout(() => this.submit(), 10);
+                // ev.preventDefault();
+            });
+
+            function rebuildSelectedArea() {
+                selectedArea.innerHTML = '';
+                const vw = visibleWrapper();
+                if (!vw) return;
+
+                // For each column, take the selected chip if any,
+                // otherwise show "???" if nothing is selected
+                vw.querySelectorAll('.column').forEach(col => {
+                    const selected = col.querySelector('.chip.selected');
+                    const text = selected ? selected.textContent : '???';
+                    const c = document.createElement('span');
+                    c.className = 'chip';
+                    c.textContent = text;
+                    selectedArea.appendChild(c);
+                });
+            }
+
+            const viewField = document.getElementById('view-field');
+
+            if (switchBtn) {
+                switchBtn.addEventListener('click', () => {
+                    viewStr.classList.toggle('hidden');
+                    viewMofo.classList.toggle('hidden');
+
+                    // update hidden field so the next POST remembers this view
+                    if (!viewStr.classList.contains('hidden')) {
+                        viewField.value = 'str';
+                        switchBtn.textContent = 'Switch to mofo view';
+                    } else {
+                        viewField.value = 'mofo';
+                        switchBtn.textContent = 'Switch to standard view';
+                    }
+
+                    document.querySelectorAll('.chip.selected').forEach(ch => ch.classList.remove('selected'));
+
+                    rebuildSelectedArea();
+                });
+
+                // set initial label correctly
+                switchBtn.textContent = viewField.value === 'str' ?
+                    'Switch to mofo view' : 'Switch to standard view';
+            }
+
+            // Clear selections
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    document.querySelectorAll('.chip.selected').forEach(ch => ch.classList.remove('selected'));
+                    rebuildSelectedArea();
+                });
+            }
+
+            // Copy to clipboard (with fallback)
+            if (copyBtn) {
+                copyBtn.addEventListener('click', async () => {
+                    const text = Array.from(selectedArea.children).map(c => c.textContent).join(' ');
+                    if (!text) { alert('No morphemes selected.'); return; }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            alert('Copied: ' + text);
+                        } catch (e) {
+                            fallbackCopy(text);
+                        }
+                    } else {
+                        fallbackCopy(text);
+                    }
+                });
+            }
+
+            function fallbackCopy(text) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); alert('Copied: ' + text); }
+                catch (e) { prompt('Copy this text:', text); }
+                finally { document.body.removeChild(ta); }
+            }
+        })();
+    </script>
+    {% endif %}
+</body>
+
+</html>
