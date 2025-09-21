@@ -1,4 +1,6 @@
 ![Static Badge](https://img.shields.io/badge/python-3.12|3.13-blue)
+![Static Badge](https://img.shields.io/badge/version-0.0.1-green)
+
 
 ## KARMA: An experimental Kalaallisut Rule-based Morphological Analayzer
 
