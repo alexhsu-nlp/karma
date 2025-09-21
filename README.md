@@ -44,6 +44,9 @@ On the terminal you will be able to see something like `Serving on http://127.0.
 
 ### References
 [1] Berthelsen, C.  (1996). Kalaallisut Sungiusaatit. Atuakkiorfik Ilinniusiorfik.
+
 [2] Fortescue, M. D. (1984). West greenlandic. London: Croom Helm.
+
 [3] Fortescue, M. (1994). Comparative Eskimo Dictionary with Aleut Cognates. Alaska Native Language Center, University of Alaska Fairbanks, PO Box 757680, Fairbanks, AK 99775-7680..
+
 [4] Lybech, S. (2022). An Introductive to West Greenlandic (2nd ed.). URL: https://oqa.dk/assets/aitwg2ED.pdf
